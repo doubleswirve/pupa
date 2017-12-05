@@ -40,7 +40,7 @@ class Scraper(scrapelib.Scraper):
     def __init__(self, jurisdiction, datadir, *, strict_validation=True, fastmode=False):
 
         # from pupa.scrape.outputs.kafka_scraper import KafkaScraper
-        from pupa.scrape.outputs.gcps_scraper import GcpsScraper
+        # from pupa.scrape.outputs.gcps_scraper import GcpsScraper
 
         super(Scraper, self).__init__()
 
@@ -78,16 +78,22 @@ class Scraper(scrapelib.Scraper):
         self.critical = self.logger.critical
 
         # Custom output
-        #self.custom_output = settings.OUTPUT_CLASS
-        self.custom_output = 'GcpsScraper'
-
-        if self.custom_output:
+        if os.getenv('PUPA_OUTPUT_CLASS'):
+            pass
             print("USING CUSTOM OUTPUT CLASS!")
             #output_class = getattr(importlib.import_module("kafka_scraper", package="pupa.scrape.outputs"), "KafkaScraper")
-            self.output_class = GcpsScraper(self)
+            importlib.import_module(".outputs","pupa.scrape")
+            self.output_class = self.load_plugin('GcpsScraper')
+            self.output_class.__init__(self)
+            #self.output_class = GcpsScraper(self)
         else:
             print("USING BASE OUTPUT CLASS!")
             self.output_class = self
+
+    def load_plugin(self, plugin):
+        mod = importlib.import_module("." + plugin, "pupa.scrape.outputs")
+        print(getattr(mod, "__init__"))
+        return mod
 
     def save_object(self, obj):
         """
@@ -147,7 +153,6 @@ class Scraper(scrapelib.Scraper):
 
     def scrape(self, **kwargs):
         raise NotImplementedError(self.__class__.__name__ + ' must provide a scrape() method')
-
 
 class BaseBillScraper(Scraper):
     skipped = 0
