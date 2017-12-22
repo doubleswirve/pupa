@@ -1,3 +1,4 @@
+import http.client
 import os
 import json
 from collections import OrderedDict
@@ -12,6 +13,10 @@ from google.cloud import pubsub
 class GoogleCloudPubSub():
 
     def __init__(self, caller):
+        # HACK: SC workaround
+        self._http_version_hack_init()
+        self._http_version_hack_set()
+
         # Allow users to explicitly provide service account info (i.e.,
         # stringified JSON) or, if on Google Cloud Platform, allow the chance
         # for credentials to be detected automatically
@@ -33,7 +38,13 @@ class GoogleCloudPubSub():
 
         self.caller = caller
 
+        # HACK: SC...
+        self._http_version_hack_undo()
+
     def save_object(self, obj):
+        # HACK: SC...
+        self._http_version_hack_set()
+
         obj.pre_save(self.caller.jurisdiction.jurisdiction_id)
 
         self.caller.info('save %s %s to topic %s', obj._type, obj, self.topic_path)
@@ -72,6 +83,31 @@ class GoogleCloudPubSub():
             else:
                 self.caller.warning(ve)
 
+        # HACK: SC...
+        self._http_version_hack_undo()
+
         # after saving and validating, save subordinate objects
         for obj in obj._related:
             self.save_object(obj)
+
+    def _http_version_hack_init(self):
+        """Cache currently set versions of HTTP in instance vars
+        """
+
+        self._http_version = http.client.HTTPConnection._http_vsn
+        self._http_version_string = http.client.HTTPConnection._http_vsn_str
+
+    def _http_version_hack_set(self):
+        """If necessary, temporarily update HTTP version for Google
+        """
+
+        if self._http_version < 11:
+            http.client.HTTPConnection._http_vsn = 11
+            http.client.HTTPConnection._http_vsn_str = 'HTTP/1.1'
+
+    def _http_version_hack_undo(self):
+        """Reset to original versions
+        """
+
+        http.client.HTTPConnection._http_vsn = self._http_version
+        http.client.HTTPConnection._http_vsn_str = self._http_version_string
