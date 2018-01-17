@@ -2,7 +2,6 @@ import os
 import json
 import redis
 from collections import OrderedDict
-from datetime import datetime, timezone
 
 from pupa import utils
 
