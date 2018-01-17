@@ -26,6 +26,7 @@ pupa = pupa.cli.__main__:main''',
           'psycopg2',
           'pytz',
           'google-cloud-pubsub==0.30.1',
+          'redis==2.10.6',
       ],
       extras_require={
           'dev': [
