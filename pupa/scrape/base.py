@@ -75,6 +75,9 @@ class Scraper(scrapelib.Scraper):
         if os.environ.get('OUTPUT_TARGET') == 'GOOGLE_CLOUD_PUBSUB':
             from pupa.scrape.outputs.google_cloud import GoogleCloudPubSub
             self.output_target = GoogleCloudPubSub(self)
+        elif os.environ.get('OUTPUT_TARGET') == 'REDIS_PUBSUB':
+            from pupa.scrape.outputs.redis import RedisPubSub
+            self.output_target = RedisPubSub(self)
         else:
             self.output_target = self
 
