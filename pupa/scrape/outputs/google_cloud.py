@@ -12,6 +12,13 @@ from google.cloud import pubsub
 class GoogleCloudPubSub():
 
     def __init__(self, caller):
+        self._connect()
+        self.topic_path = self.publisher.topic_path(
+            os.environ.get('GOOGLE_CLOUD_PROJECT'),
+            os.environ.get('GOOGLE_CLOUD_PUBSUB_TOPIC'))
+        self.caller = caller
+
+    def _connect(self):
         # Allow users to explicitly provide service account info (i.e.,
         # stringified JSON) or, if on Google Cloud Platform, allow the chance
         # for credentials to be detected automatically
@@ -27,11 +34,23 @@ class GoogleCloudPubSub():
         else:
             self.publisher = pubsub.PublisherClient()
 
-        self.topic_path = self.publisher.topic_path(
-            os.environ.get('GOOGLE_CLOUD_PROJECT'),
-            os.environ.get('GOOGLE_CLOUD_PUBSUB_TOPIC'))
-
-        self.caller = caller
+    def _publish(self, message, retry_attempt=0, retry_max_attempts=3):
+        try:
+            self.publisher.publish(
+                self.topic_path,
+                message,
+                pubdate=datetime.now(timezone.utc).strftime('%c'))
+        except Exception as publishing_exception:
+            # Workaround attempt for `StatusCode.UNAUTHENTICATED` error
+            # we've been receiving for scrapes that take a longer time
+            #
+            # @see https://github.com/GoogleCloudPlatform/google-cloud-python/issues/3212
+            if retry_attempt < retry_max_attempts:
+                # Try to reconnect and attempt publishing again
+                self._connect()
+                self._publish(message, retry_attempt + 1, retry_max_attempts)
+            else:
+                self.error(publishing_exception)
 
     def save_object(self, obj):
         obj.pre_save(self.caller.jurisdiction.jurisdiction_id)
@@ -56,10 +75,7 @@ class GoogleCloudPubSub():
                              cls=utils.JSONEncoderPlus,
                              separators=(',', ':')).encode('utf-8')
 
-        self.publisher.publish(
-            self.topic_path,
-            message,
-            pubdate=datetime.now(timezone.utc).strftime('%c'))
+        self._publish(message)
 
         # validate after writing, allows for inspection on failure
         try:
