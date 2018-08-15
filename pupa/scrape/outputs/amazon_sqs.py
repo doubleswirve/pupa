@@ -7,8 +7,6 @@ from collections import OrderedDict
 from pupa import utils
 from pupa.scrape.outputs.output import Output
 
-MAX_BYTE_LENGTH = 230000
-
 
 class AmazonSQS(Output):
 
@@ -30,14 +28,10 @@ class AmazonSQS(Output):
         self.add_output_name(obj, self.queue_name)
         obj_str = self.stringify_obj(obj, True, True)
         encoded_obj_str = obj_str.encode('utf-8')
+        key = 'S3:{}'.format(str(uuid.uuid4()))
 
-        if len(encoded_obj_str) > MAX_BYTE_LENGTH:
-            key = 'S3:{}'.format(str(uuid.uuid4()))
+        self.scraper.info('put %s %s to bucket %s/%s', obj._type, obj,
+                            self.bucket_name, key)
 
-            self.scraper.info('put %s %s to bucket %s/%s', obj._type, obj,
-                              self.bucket_name, key)
-
-            self.s3.Object(self.bucket_name, key).put(Body=encoded_obj_str)
-            self.queue.send_message(MessageBody=key)
-        else:
-            self.queue.send_message(MessageBody=obj_str)
+        self.s3.Object(self.bucket_name, key).put(Body=encoded_obj_str)
+        self.queue.send_message(MessageBody=key)
